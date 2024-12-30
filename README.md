@@ -1,3 +1,11 @@
+# make .env file and write inside it this
+
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/form_builder"
+JWT_SECRET="your-super-secret-key-change-this-in-production"
+PORT=3000
+ALLOW_NPM=true
+NODE_ENV=dev
+
 # Form Builder Backend
 
 A backend service for managing and building forms, powered by Node.js, Express, Prisma, and PostgreSQL.
