@@ -1,0 +1,63 @@
+# Use the official Bun image as base
+FROM oven/bun:latest as base
+
+# Set working directory
+WORKDIR /app
+
+# Install necessary tools for env checking
+RUN apt-get update && apt-get install -y jq
+
+# Copy package files
+COPY package*.json bun.lockb ./
+
+# Copy env check script
+COPY <<-'EOF' /usr/local/bin/check-env.sh
+#!/bin/bash
+set -e
+
+# Read required env variables from package.json if they exist
+if [ -f package.json ] && jq -e '.envs' package.json > /dev/null 2>&1; then
+    required_envs=$(jq -r '.envs[]' package.json)
+else
+    # Default required environment variables if not specified in package.json
+    required_envs=(
+        "NODE_ENV"
+        "PORT"
+        "DATABASE_URL"
+        "JWT_SECRET"
+        "POSTGRES_PASSWORD"
+        "POSTGRES_USER"
+        "POSTGRES_DB"
+        "ALLOW_NPM"
+    )
+fi
+
+# Check each required environment variable
+missing_envs=()
+for env_var in ${required_envs[@]}; do
+    if [[ -z "${!env_var}" ]]; then
+        missing_envs+=("$env_var")
+    fi
+done
+
+# If any required environment variables are missing, exit with error
+if [ ${#missing_envs[@]} -ne 0 ]; then
+    echo "Error: Missing required environment variables:"
+    printf '%s\n' "${missing_envs[@]}"
+    exit 1
+fi
+
+echo "✅ All required environment variables are set"
+EOF
+
+# Make the check script executable
+RUN chmod +x /usr/local/bin/check-env.sh
+
+# Install dependencies
+RUN bun install
+
+# Copy source code
+COPY . .
+
+# Run env check and start development server
+CMD ["/bin/bash", "-c", "/usr/local/bin/check-env.sh && bun run server:dev"]

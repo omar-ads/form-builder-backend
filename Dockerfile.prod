@@ -1,0 +1,46 @@
+# Stage 1: Install dependencies and build the application
+FROM node:18 as builder
+
+# Set the working directory
+WORKDIR /usr/src/app
+
+# Copy package.json and package-lock.json to install dependencies
+COPY package*.json ./
+
+# Install production and dev dependencies
+RUN npm install
+
+# Copy the rest of the application source code
+COPY . .
+
+# Generate Prisma client and build the application
+RUN npx prisma generate
+RUN npm run build
+
+# Stage 2: Create a production image
+FROM node:18 as production
+
+# Set the working directory
+WORKDIR /usr/src/app
+
+# Install TSX globally for runtime
+RUN npm install -g tsx
+
+# Copy only production dependencies
+COPY package*.json ./
+RUN npm install --production
+
+# Copy the built application and Prisma client from the builder stage
+COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/prisma ./prisma
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV DATABASE_URL=postgresql://user:password@db:5432/form_builder
+
+# Expose the application port
+EXPOSE 3000
+
+# Command to run the application using TSX
+CMD ["tsx", "dist/index.js"]
